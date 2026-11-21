@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quiz du ciel</title>
+<style>
+  :root { --bg:#46178f; --bg2:#2b0d5c; --red:#e21b3c; --blue:#1368ce; --yellow:#d89e00; --green:#26890c; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { height:100%; overflow:hidden; }
+  body { background:radial-gradient(ellipse at top, #5a23b0, var(--bg) 45%, var(--bg2)); color:#fff;
+    font-family:"Trebuchet MS","Segoe UI",Arial,sans-serif; display:flex; flex-direction:column; user-select:none; }
+  .screen { display:none; flex:1; flex-direction:column; align-items:center; justify-content:center; padding:2vh 3vw; gap:2.5vh; }
+  .screen.on { display:flex; }
+
+  /* Accueil */
+  .badge { font-size:clamp(16px,2.4vw,28px); letter-spacing:3px; opacity:.85; text-transform:uppercase; }
+  .title { font-size:clamp(34px,6vw,80px); font-weight:900; text-align:center; text-shadow:0 6px 0 rgba(0,0,0,.25); }
+  .btn { background:#fff; color:var(--bg); border:none; border-radius:14px; font-family:inherit; font-weight:900; font-size:clamp(20px,3vw,40px);
+    padding:2vh 4vw; cursor:pointer; box-shadow:0 8px 0 rgba(0,0,0,.3); }
+  .btn:active { transform:translateY(4px); box-shadow:0 4px 0 rgba(0,0,0,.3); }
+  .duo { display:flex; gap:4vw; align-items:flex-end; }
+
+  /* Question */
+  #q { justify-content:flex-start; }
+  .top { width:100%; display:flex; justify-content:space-between; align-items:center; font-weight:900; font-size:clamp(16px,2.2vw,30px); }
+  .pill { background:rgba(255,255,255,.18); padding:.4em 1em; border-radius:999px; }
+  #question { background:#fff; color:#222; width:100%; border-radius:14px; padding:3vh 3vw; text-align:center;
+    font-weight:900; font-size:clamp(26px,4.6vw,64px); box-shadow:0 8px 0 rgba(0,0,0,.25); }
+  #answers { flex:1; width:100%; display:grid; grid-template-columns:1fr 1fr; gap:2vh 1.5vw; }
+  .ans { border:none; border-radius:14px; color:#fff; font-family:inherit; font-weight:900; font-size:clamp(22px,3.6vw,52px); display:flex; align-items:center;
+    gap:2vw; padding:0 2.5vw; cursor:pointer; text-align:left; box-shadow:0 8px 0 rgba(0,0,0,.3); transition:opacity .4s, transform .4s; }
+  .ans svg { flex:none; width:clamp(34px,5vw,72px); height:clamp(34px,5vw,72px); }
+  .ans:active { transform:translateY(4px); }
+  .ans.dim { opacity:.25; }
+  .ans.good { transform:scale(1.03); outline:8px solid #fff; }
+  .ans.good::after { content:"✔"; margin-left:auto; font-size:1.3em; }
+  .c0{background:var(--red)} .c1{background:var(--blue)} .c2{background:var(--yellow)} .c3{background:var(--green)}
+  #next { visibility:hidden; }
+
+  /* Personnages */
+  .char { position:relative; height:var(--h,50vh); aspect-ratio:var(--ar); }
+  .char img { width:100%; height:100%; display:block; mix-blend-mode:multiply; filter:contrast(1.05); }
+  .card { background:#fff; border-radius:24px; padding:2vh 2vw; box-shadow:0 10px 0 rgba(0,0,0,.25); }
+  .tom { --ar:800/1257; } .prune { --ar:800/1492; }
+  .jump { animation:jump .55s ease-in-out infinite alternate; }
+  .jump.late { animation-delay:.27s; }
+  @keyframes jump { from { transform:translateY(0) rotate(-4deg); } to { transform:translateY(-6vh) rotate(4deg); } }
+  .sad .card { background:#cfe0f3; }
+  .sad .char { filter:saturate(.7); }
+  .sad .char { animation:sob .5s ease-in-out infinite alternate; }
+  @keyframes sob { from { transform:translateY(0); } to { transform:translateY(1vh) scaleY(.98); } }
+  .mouth { position:absolute; display:none; }
+  .sad .mouth { display:block; }
+  .tear { position:absolute; width:4%; aspect-ratio:2/3; background:#4fb3ff; border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;
+    display:none; box-shadow:0 0 6px #fff inset; animation:tear 1s ease-in infinite; opacity:0; }
+  .sad .tear { display:block; }
+  @keyframes tear { 0% { transform:translateY(0) scale(.6); opacity:0; } 15% { opacity:1; } 100% { transform:translateY(28vh) scale(1); opacity:0; } }
+
+  /* Superposition résultat */
+  #overlay { position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:3vh;
+    background:rgba(20,5,45,.82); z-index:5; }
+  #overlay.on { display:flex; animation:pop .3s ease-out; }
+  @keyframes pop { from { opacity:0; transform:scale(.9); } to { opacity:1; transform:scale(1); } }
+  #ovText { font-size:clamp(30px,5.5vw,80px); font-weight:900; text-align:center; text-shadow:0 6px 0 rgba(0,0,0,.35); }
+  #overlay.sad #ovText { color:#9fd3ff; }
+
+  /* Fin */
+  .stars { font-size:clamp(50px,9vw,130px); letter-spacing:2vw; animation:shine 1s ease-in-out infinite alternate; }
+  @keyframes shine { from { filter:drop-shadow(0 0 6px #ffd700); transform:scale(1); } to { filter:drop-shadow(0 0 26px #ffd700); transform:scale(1.08); } }
+  #score { font-size:clamp(20px,3vw,40px); font-weight:700; opacity:.9; }
+
+  #confetti { position:fixed; inset:0; pointer-events:none; z-index:10; }
+  #fs { position:fixed; top:10px; right:10px; background:rgba(255,255,255,.15); color:#fff; border:none; border-radius:8px;
+    font-size:14px; padding:6px 10px; cursor:pointer; z-index:20; }
+</style>
+</head>
+<body>
+<button id="fs" title="Plein écran">⛶ plein écran</button>
+
+<!-- Accueil -->
+<section class="screen on" id="home">
+  <div class="badge">★ Police de l'air des Farfadets ★</div>
+  <div class="title">Examen<br>« Connaître le ciel »</div>
+  <div class="duo" id="homeDuo"></div>
+  <button class="btn" id="start">C'est parti ! ➜</button>
+</section>
+
+<!-- Question -->
+<section class="screen" id="q">
+  <div class="top"><span class="pill" id="counter">Question 1 / 10</span><span class="pill" id="pts">⭐ 0</span></div>
+  <div id="question"></div>
+  <div id="answers"></div>
+  <button class="btn" id="next">Question suivante ➜</button>
+</section>
+
+<!-- Fin -->
+<section class="screen" id="end">
+  <div class="stars">⭐⭐⭐</div>
+  <div class="title">Bravo, agents !<br>Troisième étoile gagnée !</div>
+  <div class="duo" id="endDuo"></div>
+  <div id="score"></div>
+  <button class="btn" id="again">Recommencer</button>
+</section>
+
+<div id="overlay"><div id="ovText"></div><div class="duo" id="ovDuo"></div></div>
+<canvas id="confetti"></canvas>
+
+<script>
+// ====== LES QUESTIONS (la première réponse de chaque liste est la bonne ; l'ordre est mélangé à l'affichage) ======
+const QUESTIONS = [
+  { q: "Qu'est-ce qui fait monter une montgolfière ?", r: ["De l'air chaud", "Des pédales", "Un moteur", "Des oiseaux attachés"] },
+  { q: "Quel gaz fait flotter les ballons de fête ?", r: ["L'hélium", "Le jus d'orange", "L'eau", "Le chocolat chaud"] },
+  { q: "Qui conduit un avion ?", r: ["Le pilote", "Le chauffeur de bus", "Le cuisinier", "Le facteur"] },
+  { q: "Quelle est l'étoile la plus proche de la Terre ?", r: ["Le Soleil", "La Lune", "Mars", "Une ampoule"] },
+  { q: "Qui étaient les tout premiers passagers d'une montgolfière ?", r: ["Un mouton, un canard et un coq", "Trois chats", "Un chien", "Une vache"] },
+  { q: "Combien d'ailes a un avion ?", r: ["2", "4", "10", "Aucune"] },
+  { q: "Quel engin vole sans moteur ?", r: ["Le planeur", "L'hélicoptère", "La fusée", "L'avion de ligne"] },
+  { q: "Où va une fusée ?", r: ["Dans l'espace", "Au fond de la mer", "Sous la terre", "À la boulangerie"] },
+  { q: "Comment s'appellent les inventeurs de la montgolfière ?", r: ["Les frères Montgolfier", "Les frères Ballon", "Les frères Nuage", "Les frères Avion"] },
+  { q: "Que met-on sur son dos pour sauter d'un avion ?", r: ["Un parachute", "Un parapluie", "Un cartable", "Un oreiller"] }
+];
+// ===================================================================================================================
+
+const $ = id => document.getElementById(id);
+const SHAPES = [
+  '<svg viewBox="0 0 100 100"><polygon points="50,8 94,88 6,88" fill="#fff"/></svg>',
+  '<svg viewBox="0 0 100 100"><polygon points="50,4 96,50 50,96 4,50" fill="#fff"/></svg>',
+  '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="#fff"/></svg>',
+  '<svg viewBox="0 0 100 100"><rect x="10" y="10" width="80" height="80" fill="#fff"/></svg>'
+];
+
+// Personnages : position des yeux et de la bouche (en % de l'image) pour les larmes et la moue
+const CHARS = {
+  tom:   { img: "tom.jpg", fallback: "🧝", eyes: [[51,27],[66,25.5]], mouth: { x:64, y:35.6, w:17, h:7, skin:"#f7c8a2" } },
+  prune: { img: "prune.jpg", fallback: "🧝‍♀️", eyes: [[39,25.5],[54,25.5]], mouth: { x:46.3, y:33.6, w:10, h:4.2, skin:"#f5c9a5" } }
+};
+
+function makeChar(name, h, extra = "") {
+  const c = CHARS[name];
+  const card = document.createElement("div");
+  card.className = "card " + extra;
+  const el = document.createElement("div");
+  el.className = "char " + name;
+  el.style.setProperty("--h", h);
+  const img = document.createElement("img");
+  img.src = c.img; img.alt = name;
+  img.onerror = () => { el.innerHTML = '<div style="font-size:calc(' + h + ' * .6);line-height:1">' + c.fallback + '</div>'; el.style.aspectRatio = "auto"; };
+  el.appendChild(img);
+  // moue (cache le sourire et dessine une bouche triste)
+  const m = c.mouth;
+  const mouth = document.createElement("div");
+  mouth.className = "mouth";
+  Object.assign(mouth.style, { left:(m.x - m.w/2)+"%", top:(m.y - m.h/2)+"%", width:m.w+"%", height:m.h+"%" });
+  mouth.innerHTML = '<svg viewBox="0 0 100 50" preserveAspectRatio="none" style="width:100%;height:100%;overflow:visible">' +
+    '<ellipse cx="50" cy="25" rx="52" ry="30" fill="' + m.skin + '"/>' +
+    '<path d="M18,40 Q50,0 82,40" fill="none" stroke="#3a1f12" stroke-width="7" stroke-linecap="round"/></svg>';
+  el.appendChild(mouth);
+  // larmes
+  c.eyes.forEach((e, i) => {
+    for (let k = 0; k < 2; k++) {
+      const t = document.createElement("div");
+      t.className = "tear";
+      t.style.left = (e[0] - 2) + "%"; t.style.top = (e[1] + 1.5) + "%";
+      t.style.animationDelay = (i * .35 + k * .5) + "s";
+      el.appendChild(t);
+    }
+  });
+  card.appendChild(el);
+  return card;
+}
+
+function fillDuo(id, h, jumping) {
+  const d = $(id); d.innerHTML = "";
+  const a = makeChar("tom", h), b = makeChar("prune", h);
+  if (jumping) { a.classList.add("jump"); b.classList.add("jump", "late"); }
+  d.append(a, b);
+}
+
+// ===== Sons =====
+let ac = null;
+function audio() { if (!ac) try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} return ac; }
+function note(f, t0, dur, type = "triangle", vol = .25, slideTo = null) {
+  const a = audio(); if (!a) return;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, a.currentTime + t0);
+  if (slideTo) o.frequency.linearRampToValueAtTime(slideTo, a.currentTime + t0 + dur);
+  g.gain.setValueAtTime(vol, a.currentTime + t0);
+  g.gain.exponentialRampToValueAtTime(.001, a.currentTime + t0 + dur);
+  o.connect(g); g.connect(a.destination); o.start(a.currentTime + t0); o.stop(a.currentTime + t0 + dur + .05);
+}
+function soundWin() { [523, 659, 784, 1047].forEach((f, i) => note(f, i * .11, .35)); note(1319, .5, .6); }
+function soundLose() { [392, 370, 349].forEach((f, i) => note(f, i * .38, .36, "sawtooth", .12)); note(330, 1.14, .9, "sawtooth", .12, 300); }
+function soundFanfare() { [523,523,523,659,784,659,784,1047].forEach((f,i)=>note(f, i*.14, .3)); }
+
+// ===== Confettis =====
+const cv = $("confetti"), cx = cv.getContext("2d");
+let parts = [], raf = null;
+function resize() { cv.width = innerWidth; cv.height = innerHeight; }
+addEventListener("resize", resize); resize();
+const COLORS = ["#e21b3c","#1368ce","#d89e00","#26890c","#ffffff","#ff7ad9","#ffd700"];
+function confetti(n = 220) {
+  for (let i = 0; i < n; i++) parts.push({
+    x: Math.random() * cv.width, y: -20 - Math.random() * cv.height * .5,
+    vx: (Math.random() - .5) * 4, vy: 2 + Math.random() * 4, r: Math.random() * 6.28, vr: (Math.random() - .5) * .3,
+    w: 8 + Math.random() * 8, h: 5 + Math.random() * 6, c: COLORS[i % COLORS.length]
+  });
+  if (!raf) loop();
+}
+function loop() {
+  cx.clearRect(0, 0, cv.width, cv.height);
+  parts.forEach(p => { p.x += p.vx; p.y += p.vy; p.vy += .04; p.r += p.vr;
+    cx.save(); cx.translate(p.x, p.y); cx.rotate(p.r); cx.fillStyle = p.c; cx.fillRect(-p.w/2, -p.h/2, p.w, p.h); cx.restore(); });
+  parts = parts.filter(p => p.y < cv.height + 30);
+  raf = parts.length ? requestAnimationFrame(loop) : (cx.clearRect(0, 0, cv.width, cv.height), null);
+}
+
+// ===== Jeu =====
+let idx = 0, score = 0, answered = false, order = [];
+function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function show(id) { document.querySelectorAll(".screen").forEach(s => s.classList.toggle("on", s.id === id)); }
+
+function renderQuestion() {
+  const Q = QUESTIONS[idx];
+  answered = false;
+  $("counter").textContent = "Question " + (idx + 1) + " / " + QUESTIONS.length;
+  $("pts").textContent = "⭐ " + score;
+  $("question").textContent = Q.q;
+  order = shuffle(Q.r.map((t, i) => ({ t, ok: i === 0 })));
+  $("answers").innerHTML = "";
+  order.forEach((a, i) => {
+    const b = document.createElement("button");
+    b.className = "ans c" + i;
+    b.innerHTML = SHAPES[i] + "<span>" + a.t + "</span>";
+    b.onclick = () => choose(i, b);
+    $("answers").appendChild(b);
+  });
+  $("next").style.visibility = "hidden";
+  $("next").textContent = idx === QUESTIONS.length - 1 ? "Résultat ➜" : "Question suivante ➜";
+}
+
+function choose(i, btn) {
+  if (answered) return;
+  answered = true;
+  const ok = order[i].ok;
+  const ov = $("overlay"), duo = $("ovDuo");
+  duo.innerHTML = "";
+  if (ok) {
+    score++;
+    ov.classList.remove("sad");
+    $("ovText").textContent = "Bravo ! Tom et Prune sont trop contents !";
+    fillDuo("ovDuo", "52vh", true);
+    soundWin(); confetti();
+  } else {
+    ov.classList.add("sad");
+    const who = Math.random() < .5 ? "tom" : "prune";
+    $("ovText").textContent = "Oh non… " + (who === "tom" ? "Tom" : "Prune") + " est tout triste !";
+    duo.appendChild(makeChar(who, "56vh"));
+    soundLose();
+  }
+  ov.classList.add("on");
+  setTimeout(() => {
+    ov.classList.remove("on");
+    document.querySelectorAll(".ans").forEach((b, k) => b.classList.add(order[k].ok ? "good" : "dim"));
+    $("pts").textContent = "⭐ " + score;
+    $("next").style.visibility = "visible";
+  }, 3000);
+}
+
+$("next").onclick = () => {
+  idx++;
+  if (idx < QUESTIONS.length) renderQuestion();
+  else finish();
+};
+
+function finish() {
+  show("end");
+  fillDuo("endDuo", "40vh", true);
+  $("score").textContent = score + " bonne" + (score > 1 ? "s" : "") + " réponse" + (score > 1 ? "s" : "") + " sur " + QUESTIONS.length;
+  soundFanfare();
+  confetti(320); setTimeout(() => confetti(320), 1500); setTimeout(() => confetti(320), 3000);
+}
+
+$("start").onclick = () => { audio(); idx = 0; score = 0; show("q"); renderQuestion(); };
+$("again").onclick = () => { show("home"); };
+$("overlay").onclick = () => {}; // on attend la fin de l'animation
+$("fs").onclick = () => {
+  const d = document;
+  if (!d.fullscreenElement) d.documentElement.requestFullscreen && d.documentElement.requestFullscreen().catch(() => {});
+  else d.exitFullscreen && d.exitFullscreen();
+};
+// Clavier : 1-4 pour répondre, Espace/Entrée pour continuer
+addEventListener("keydown", e => {
+  if ($("q").classList.contains("on")) {
+    const n = "1234".indexOf(e.key);
+    if (n >= 0 && !answered) document.querySelectorAll(".ans")[n].click();
+    if ((e.key === " " || e.key === "Enter") && $("next").style.visibility === "visible") { e.preventDefault(); $("next").click(); }
+  }
+});
+
+fillDuo("homeDuo", "42vh", false);
+</script>
+</body>
+</html>
