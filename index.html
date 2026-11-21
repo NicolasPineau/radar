@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Radar Police de l'Air</title>
+<style>
+  :root { --g:#33ff66; --gd:#0b5f22; --bg:#000; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { background:var(--bg); color:var(--g); font-family:"Courier New",monospace; height:100%; overflow:hidden; }
+  body { display:flex; flex-direction:column; align-items:center; padding:12px 16px; gap:10px; text-shadow:0 0 6px var(--g); }
+  h1 { font-size:20px; letter-spacing:2px; text-align:center; }
+  #radar { position:relative; width:min(86vw,58vh); aspect-ratio:1; border-radius:50%; border:3px solid var(--g);
+    background:radial-gradient(circle, rgba(51,255,102,.08) 0%, transparent 70%); box-shadow:0 0 20px var(--gd) inset, 0 0 12px var(--gd); overflow:hidden; }
+  .ring { position:absolute; border:1px solid var(--gd); border-radius:50%; top:50%; left:50%; transform:translate(-50%,-50%); }
+  .axis { position:absolute; background:var(--gd); }
+  #sweep { position:absolute; inset:0; border-radius:50%;
+    background:conic-gradient(from 0deg, rgba(51,255,102,.45), transparent 60deg); animation:spin 3s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  #arrow { position:absolute; top:50%; left:50%; width:0; height:0; transition:transform .25s ease-out; }
+  #arrow svg { position:absolute; width:min(40vw,27vh); height:min(40vw,27vh); left:50%; top:50%; transform:translate(-50%,-50%); filter:drop-shadow(0 0 8px var(--g)); }
+  #msg { font-size:22px; font-weight:bold; text-align:center; min-height:2.4em; display:flex; align-items:center; }
+  #bars { display:flex; gap:6px; align-items:flex-end; height:44px; }
+  .bar { width:22px; border:2px solid var(--g); }
+  .bar.on { background:var(--g); box-shadow:0 0 10px var(--g); }
+  #dist { font-size:16px; opacity:.85; }
+  button { background:#000; color:var(--g); border:2px solid var(--g); font:bold 18px "Courier New",monospace; padding:12px 18px; border-radius:10px; text-shadow:0 0 6px var(--g); }
+  button:active { background:var(--gd); }
+  #start { font-size:24px; padding:18px 28px; margin-top:20px; }
+  #blip { position:absolute; width:22px; height:22px; margin:-11px 0 0 -11px; border-radius:50%; background:#fff;
+    box-shadow:0 0 10px var(--g), 0 0 24px var(--g); display:none; animation:blink .6s ease-in-out infinite alternate; }
+  @keyframes blink { from { opacity:1; transform:scale(1); } to { opacity:.35; transform:scale(.7); } }
+  .found #radar { border-color:#fff; box-shadow:0 0 40px var(--g); }
+</style>
+</head>
+<body>
+  <h1>★ POLICE DE L'AIR ★<br>RADAR DES FARFADETS</h1>
+
+  <button id="start">▶ ALLUMER LE RADAR</button>
+
+  <div id="ui" style="display:none; flex-direction:column; align-items:center; gap:10px;">
+    <div id="radar">
+      <div class="ring" style="width:33%;height:33%"></div>
+      <div class="ring" style="width:66%;height:66%"></div>
+      <div class="axis" style="left:50%;top:0;bottom:0;width:1px"></div>
+      <div class="axis" style="top:50%;left:0;right:0;height:1px"></div>
+      <div id="sweep"></div>
+      <div id="blip"></div>
+      <div id="arrow">
+        <svg viewBox="0 0 100 100"><polygon points="50,4 82,58 60,52 60,96 40,96 40,52 18,58" fill="#33ff66"/></svg>
+      </div>
+    </div>
+    <div id="bars"></div>
+    <div id="msg">RECHERCHE DU SIGNAL…</div>
+    <div id="dist"></div>
+  </div>
+
+
+<script>
+const $ = id => document.getElementById(id);
+
+// Cibles de départ (modifiables ici)
+const PRESETS = [
+  { nom: "Cachette 1", lat: 49.34900838796811, lon: 2.773024393258163 }
+];
+
+let targets = PRESETS;
+let idx = 0;
+let pos = null, acc = null, heading = null, dist = null, bearing = null;
+let audio = null, beepTimer = null;
+
+// Barres de signal
+for (let i = 0; i < 5; i++) {
+  const b = document.createElement("div");
+  b.className = "bar"; b.style.height = (10 + i * 8) + "px";
+  $("bars").appendChild(b);
+}
+
+function rad(d) { return d * Math.PI / 180; }
+function haversine(a, b) {
+  const R = 6371000, dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
+  const h = Math.sin(dLat/2)**2 + Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function bearingTo(a, b) {
+  const y = Math.sin(rad(b.lon - a.lon)) * Math.cos(rad(b.lat));
+  const x = Math.cos(rad(a.lat))*Math.sin(rad(b.lat)) - Math.sin(rad(a.lat))*Math.cos(rad(b.lat))*Math.cos(rad(b.lon - a.lon));
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+function level(d) {
+  if (d < 5) return 5;
+  if (d < 10) return 4;
+  if (d < 25) return 3;
+  if (d < 50) return 2;
+  if (d < 100) return 1;
+  return 0;
+}
+
+function update() {
+  const t = targets[idx];
+  if (!pos || !t) return;
+  dist = haversine(pos, t);
+  bearing = bearingTo(pos, t);
+  const lvl = level(dist);
+  $("msg").textContent = ['SIGNAL TRÈS FAIBLE','SIGNAL FAIBLE','SIGNAL DÉTECTÉ','SIGNAL FORT','CIBLE TOUTE PROCHE','CIBLE ATTEINTE - FOUILLEZ LA ZONE'][lvl];
+  document.querySelectorAll(".bar").forEach((b, i) => b.classList.toggle("on", i < lvl));
+  document.body.classList.toggle("found", lvl === 5);
+  $("dist").textContent = Math.round(dist) + " m" + (acc ? "  (précision ±" + Math.round(acc) + " m)" : "");
+  const h = heading == null ? 0 : heading;
+  $("arrow").style.transform = "rotate(" + (bearing - h) + "deg)";
+  // Point sur le radar quand on est à moins de 25 m
+  const blip = $("blip");
+  if (dist < 25) {
+    const a = rad(bearing - h), r = Math.max(dist, 1.5) / 25 * 45;
+    blip.style.left = (50 + r * Math.sin(a)) + "%";
+    blip.style.top = (50 - r * Math.cos(a)) + "%";
+    blip.style.display = "block";
+  } else blip.style.display = "none";
+}
+
+function beep() {
+  if (!audio) return;
+  const o = audio.createOscillator(), g = audio.createGain();
+  o.frequency.value = dist != null && dist < 5 ? 1200 : 880;
+  g.gain.setValueAtTime(0.25, audio.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.12);
+  o.connect(g); g.connect(audio.destination);
+  o.start(); o.stop(audio.currentTime + 0.13);
+}
+function beepLoop() {
+  beep();
+  const d = dist == null ? 200 : dist;
+  const delay = Math.max(120, Math.min(2000, d * 15));
+  beepTimer = setTimeout(beepLoop, delay);
+}
+
+function onOrient(e) {
+  if (e.webkitCompassHeading != null) heading = e.webkitCompassHeading;
+  else if (e.absolute && e.alpha != null) heading = (360 - e.alpha) % 360;
+  else return;
+  const so = (screen.orientation && screen.orientation.angle) || 0;
+  heading = (heading + so) % 360;
+  update();
+}
+
+$("start").onclick = async () => {
+  try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+  if (typeof DeviceOrientationEvent !== "undefined" && DeviceOrientationEvent.requestPermission) {
+    try { await DeviceOrientationEvent.requestPermission(); } catch (e) {}
+  }
+  if ("ondeviceorientationabsolute" in window) window.addEventListener("deviceorientationabsolute", onOrient);
+  else window.addEventListener("deviceorientation", onOrient);
+
+  if (!navigator.geolocation) { $("msg").textContent = "GPS INDISPONIBLE"; }
+  else navigator.geolocation.watchPosition(p => {
+    pos = { lat: p.coords.latitude, lon: p.coords.longitude };
+    acc = p.coords.accuracy;
+    update();
+  }, () => { $("msg").textContent = "GPS REFUSÉ OU INDISPONIBLE"; }, { enableHighAccuracy: true, maximumAge: 1000 });
+
+  $("start").style.display = "none";
+  $("ui").style.display = "flex";
+  beepLoop();
+};
+
+</script>
+</body>
+</html>
