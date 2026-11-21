@@ -42,12 +42,12 @@
   .char { position:relative; height:var(--h,50vh); aspect-ratio:var(--ar); }
   .char img { width:100%; height:100%; display:block; mix-blend-mode:multiply; filter:contrast(1.05); }
   .card { background:#fff; border-radius:24px; padding:2vh 2vw; box-shadow:0 10px 0 rgba(0,0,0,.25); }
-  .tom { --ar:800/1257; } .prune { --ar:800/1492; }
+  .tom { --ar:800/1257; } .prune { --ar:800/1492; } .happy { --ar:1312/1199; } .sadduo { --ar:1312/1199; }
   .jump { animation:jump .55s ease-in-out infinite alternate; }
   .jump.late { animation-delay:.27s; }
   @keyframes jump { from { transform:translateY(0) rotate(-4deg); } to { transform:translateY(-6vh) rotate(4deg); } }
-  .sad .card { background:#cfe0f3; }
-  .sad .char { filter:saturate(.7); }
+  .sad .card { background:#fff; }
+  
   .sad .char { animation:sob .5s ease-in-out infinite alternate; }
   @keyframes sob { from { transform:translateY(0); } to { transform:translateY(1vh) scaleY(.98); } }
   .mouth { position:absolute; display:none; }
@@ -66,7 +66,9 @@
   #overlay.sad #ovText { color:#9fd3ff; }
 
   /* Fin */
-  .stars { font-size:clamp(50px,9vw,130px); letter-spacing:2vw; animation:shine 1s ease-in-out infinite alternate; }
+  #end .title { font-size:clamp(28px,4.5vw,60px); }
+  #end { gap:1.8vh; }
+  .stars { font-size:clamp(40px,7vw,100px); letter-spacing:2vw; animation:shine 1s ease-in-out infinite alternate; }
   @keyframes shine { from { filter:drop-shadow(0 0 6px #ffd700); transform:scale(1); } to { filter:drop-shadow(0 0 26px #ffd700); transform:scale(1.08); } }
   #score { font-size:clamp(20px,3vw,40px); font-weight:700; opacity:.9; }
 
@@ -172,9 +174,19 @@ function makeChar(name, h, extra = "") {
 
 function fillDuo(id, h, jumping) {
   const d = $(id); d.innerHTML = "";
-  const a = makeChar("tom", h), b = makeChar("prune", h);
-  if (jumping) { a.classList.add("jump"); b.classList.add("jump", "late"); }
-  d.append(a, b);
+  if (jumping) {
+    // Tom et Prune contents ensemble
+    const card = document.createElement("div");
+    card.className = "card jump";
+    const el = document.createElement("div");
+    el.className = "char happy"; el.style.setProperty("--h", h);
+    const img = document.createElement("img");
+    img.src = "tom-prune-contents.jpg"; img.alt = "Tom et Prune contents";
+    img.onerror = () => { el.innerHTML = '<div style="font-size:calc(' + h + ' * .5);line-height:1">🥳</div>'; el.style.aspectRatio = "auto"; };
+    el.appendChild(img); card.appendChild(el); d.appendChild(card);
+    return;
+  }
+  d.append(makeChar("tom", h), makeChar("prune", h));
 }
 
 // ===== Sons =====
@@ -249,13 +261,19 @@ function choose(i, btn) {
     score++;
     ov.classList.remove("sad");
     $("ovText").textContent = "Bravo ! Tom et Prune sont trop contents !";
-    fillDuo("ovDuo", "52vh", true);
+    fillDuo("ovDuo", "58vh", true);
     soundWin(); confetti();
   } else {
     ov.classList.add("sad");
-    const who = Math.random() < .5 ? "tom" : "prune";
-    $("ovText").textContent = "Oh non… " + (who === "tom" ? "Tom" : "Prune") + " est tout triste !";
-    duo.appendChild(makeChar(who, "56vh"));
+    $("ovText").textContent = "Oh non… Tom et Prune sont tout tristes !";
+    const card = document.createElement("div");
+    card.className = "card";
+    const el = document.createElement("div");
+    el.className = "char sadduo"; el.style.setProperty("--h", "58vh");
+    const img = document.createElement("img");
+    img.src = "tom-prune-tristes.jpg"; img.alt = "Tom et Prune tristes";
+    img.onerror = () => { el.innerHTML = '<div style="font-size:30vh;line-height:1">😢</div>'; el.style.aspectRatio = "auto"; };
+    el.appendChild(img); card.appendChild(el); duo.appendChild(card);
     soundLose();
   }
   ov.classList.add("on");
@@ -275,7 +293,7 @@ $("next").onclick = () => {
 
 function finish() {
   show("end");
-  fillDuo("endDuo", "40vh", true);
+  fillDuo("endDuo", "30vh", true);
   $("score").textContent = score + " bonne" + (score > 1 ? "s" : "") + " réponse" + (score > 1 ? "s" : "") + " sur " + QUESTIONS.length;
   soundFanfare();
   confetti(320); setTimeout(() => confetti(320), 1500); setTimeout(() => confetti(320), 3000);
