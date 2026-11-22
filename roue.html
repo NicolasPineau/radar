@@ -55,9 +55,10 @@ async function fusee(){
  const al=$("alert");al.className="on flash";$("small").textContent="ALERTE FUSÉE !";$("big").textContent="🚀";
  for(let i=0;i<10;i++){tone(i%2?600:900,.45,"square",.15);await wait(500);}
  al.className="on count";$("small").textContent="Tout le monde avec moi :";
- for(const k of ["3","2","1"]){$("big").textContent=k;tone(440,.4,"square",.2);await wait(1000);}
- $("small").textContent="";$("big").textContent="DÉCOLLAGE ! 🚀";tone(880,1.2,"sawtooth",.2);
- await wait(2500);al.className="";
+ for(const k of ["3","2","1"]){$("big").textContent=k;tone(440,.5,"square",.2);await wait(1800);}
+ $("small").textContent="";$("big").style.fontSize="min(13vw,22vh)";$("big").textContent="DÉCOLLAGE !";$("small").textContent="🚀🚀🚀";
+ tone(880,1.2,"sawtooth",.2);
+ await wait(3000);al.className="";$("big").style.fontSize="";
 }
 $("go").onclick=()=>{if(busy)return;busy=true;$("res").textContent="";
  const k=Math.floor(Math.random()*n);rot+=360*6+(360-(k+.5)*360/n)-(rot%360);
