@@ -52,19 +52,10 @@
 </head>
 <body class="scan">
 
-<!-- 1. Préparation (pour l'animateur) -->
-<section class="screen on" id="setup">
-  <div class="badge">★ POLICE DE L'AIR DES FARFADETS ★</div>
-  <h1>Lecteur de boîte noire</h1>
-  <p>Préparation (à faire avant l'arrivée des enfants) : choisis le fichier vidéo de la boîte noire, enregistré sur l'ordinateur.
-     Ensuite, appuie sur « Prêt » : l'écran d'attente s'affiche en plein écran.</p>
-  <label class="btn">📁 Choisir la vidéo<input type="file" id="file" accept="video/*" hidden></label>
-  <div id="fileName"></div>
-  <button class="btn" id="ready" disabled style="opacity:.4">✔ Prêt</button>
-</section>
+<input type="file" id="file" accept="video/*" hidden>
 
 <!-- 2. Attente du branchement -->
-<section class="screen" id="wait">
+<section class="screen on" id="wait">
   <div class="badge">★ POLICE DE L'AIR DES FARFADETS ★ ANALYSE DES ÉPAVES ★</div>
   <div class="box">⬛ BOÎTE NOIRE</div>
   <h1 class="blink">BRANCHEZ LA BOÎTE NOIRE…</h1>
@@ -89,7 +80,6 @@
   <div style="font-size:clamp(18px,3vw,40px)">Signal perdu…</div>
 </section>
 
-<div id="hint">Espace / Entrée = ANALYSER · Échap = recommencer</div>
 
 <script>
 const $ = id => document.getElementById(id);
@@ -108,33 +98,23 @@ function tone(f, d, type = "square", v = .12) {
 }
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
-// Préparation
-let videoURL = null;
+// Chargement : boite-noire.mp4 à côté de la page ; sinon, choix manuel au premier clic sur ANALYSER
+let videoOK = false, videoURL = null;
+const v0 = $("vid");
+v0.addEventListener("loadedmetadata", () => { videoOK = true; }, { once: true });
+v0.src = "boite-noire.mp4"; v0.load();
 $("file").onchange = e => {
   const f = e.target.files[0]; if (!f) return;
-  if (videoURL) URL.revokeObjectURL(videoURL);
-  videoURL = URL.createObjectURL(f);
-  $("vid").src = videoURL; $("vid").load();
-  $("fileName").textContent = "Vidéo chargée : " + f.name;
-  $("ready").disabled = false; $("ready").style.opacity = 1;
+  videoURL = URL.createObjectURL(f); $("vid").src = videoURL; $("vid").load(); videoOK = true; analyse();
 };
-// Chargement automatique de « boite-noire.mp4 » s'il est dans le même dossier que cette page
-(() => {
-  const v = $("vid");
-  const ok = () => {
-    if (videoURL) return; // une vidéo a déjà été choisie à la main
-    $("fileName").textContent = "✔ Vidéo trouvée automatiquement : boite-noire.mp4";
-    $("ready").disabled = false; $("ready").style.opacity = 1;
-  };
-  const ko = () => { if (!videoURL) $("fileName").textContent = "Aucune vidéo « boite-noire.mp4 » trouvée à côté de la page : choisis-la à la main."; };
-  v.addEventListener("loadedmetadata", ok, { once: true });
-  v.addEventListener("error", ko, { once: true });
-  v.src = "boite-noire.mp4"; v.load();
-})();
-$("ready").onclick = () => {
+// Plein écran au premier clic ou à la première touche
+let fs = false;
+function goFull() {
+  if (fs) return; fs = true;
   try { document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {}); } catch (e) {}
-  tone(660, .1); show("wait"); $("hint").style.display = "none";
-};
+}
+addEventListener("pointerdown", goFull, true);
+addEventListener("keydown", goFull, true);
 
 // Analyse
 let running = false;
@@ -148,7 +128,9 @@ const STEPS = [
   [100,"> LECTURE !"]
 ];
 async function analyse() {
-  if (running) return; running = true;
+  if (running) return;
+  if (!videoOK) { $("file").click(); return; }
+  running = true;
   show("scan"); $("log").innerHTML = ""; $("fill").style.width = "0"; $("pct").textContent = "0 %";
   const total = 9000, t0 = performance.now(); let shown = 0;
   await new Promise(res => {
@@ -177,7 +159,7 @@ addEventListener("keydown", e => {
   if ((e.key === " " || e.key === "Enter" || e.key === "PageDown" || e.key === "ArrowRight") && $("wait").classList.contains("on")) {
     e.preventDefault(); analyse();
   }
-  if (e.key === "Escape" && !$("setup").classList.contains("on")) {
+  if (e.key === "Escape") {
     const v = $("vid"); v.pause(); v.controls = false; running = false; show("wait");
   }
 });
