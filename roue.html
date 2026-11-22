@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Roue des déplacements</title>
+<style>
+body{margin:0;height:100vh;background:#46178f;color:#fff;font-family:"Trebuchet MS",Arial,sans-serif;
+ display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh;overflow:hidden}
+h1{margin:0;font-size:clamp(22px,4vw,48px)}
+#wrap{position:relative;width:min(70vh,90vw);height:min(70vh,90vw)}
+canvas{width:100%;height:100%;transition:transform 4s cubic-bezier(.15,.85,.2,1)}
+#ptr{position:absolute;top:-2%;left:50%;transform:translateX(-50%);width:0;height:0;
+ border-left:4vh solid transparent;border-right:4vh solid transparent;border-top:7vh solid #fff;filter:drop-shadow(0 4px 2px #0006);z-index:2}
+button{font-family:inherit;font-weight:900;font-size:clamp(20px,3.5vw,40px);padding:1.5vh 5vw;border:none;border-radius:14px;background:#fff;color:#46178f;
+ box-shadow:0 7px 0 #0005;cursor:pointer}
+#res{font-size:clamp(26px,5vw,64px);font-weight:900;min-height:1.3em;text-align:center;text-shadow:0 4px 0 #0004}
+#alert{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+ z-index:10;text-align:center;font-weight:900;color:#fff}
+#alert.on{display:flex}
+#alert.flash{animation:fl .5s steps(1) infinite}
+@keyframes fl{0%{background:#e00}50%{background:#300}}
+#alert.count{background:#000}
+#big{font-size:clamp(60px,22vw,320px);line-height:1;text-shadow:0 0 30px #f80}
+#small{font-size:clamp(24px,5vw,64px)}
+</style></head><body>
+<h1>✈ Comment vas-tu livrer ton message ? ✈</h1>
+<div id="wrap"><div id="ptr"></div><canvas id="c" width="800" height="800"></canvas></div>
+<div id="res"></div>
+<button id="go">Lancer la roue !</button>
+<div id="alert"><div id="small"></div><div id="big"></div></div>
+<script>
+const T=[
+ ["✈️","En avion, bras écartés"],
+ ["🦘","À cloche-pied"],
+ ["🔙","En marche arrière"],
+ ["🎈","En montgolfière : accroupi, puis on monte tout doucement"],
+ ["🚀","Comme une fusée : file en courant, les mains jointes au-dessus de la tête !"],
+ ["📦","Livraison spéciale : le papier sur la tête, sans les mains !"],
+ ["🛬","Avion en approche : un tour complet de la salle avant d'atterrir"],
+ ["🚁","En hélicoptère : en tournant sur soi"]];
+const FUSEE=4;
+const C=["#e21b3c","#1368ce","#d89e00","#26890c","#000","#0aa3a3","#ff6f00","#c2185b"];
+const cv=document.getElementById("c"),x=cv.getContext("2d"),n=T.length,a=2*Math.PI/n;
+for(let i=0;i<n;i++){x.beginPath();x.moveTo(400,400);x.arc(400,400,395,i*a-Math.PI/2,(i+1)*a-Math.PI/2);x.fillStyle=C[i];x.fill();
+ x.strokeStyle=i===FUSEE?"#ffd700":"#fff";x.lineWidth=i===FUSEE?14:6;x.stroke();
+ x.save();x.translate(400,400);x.rotate((i+.5)*a-Math.PI/2);
+ if(i===FUSEE){x.fillStyle="#ffd700";x.font="40px serif";["★","★","★"].forEach((s,k)=>x.fillText(s,150+k*55,k%2?-40:40));}
+ x.font="90px serif";x.textAlign="right";x.textBaseline="middle";x.fillText(T[i][0],360,0);x.restore();}
+x.beginPath();x.arc(400,400,55,0,7);x.fillStyle="#fff";x.fill();
+const $=id=>document.getElementById(id);
+let rot=0,busy=false,ac;
+function tone(f,d,type="sine",v=.2){try{ac=ac||new AudioContext();const o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.value=f;
+ g.gain.setValueAtTime(v,ac.currentTime);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+d);o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+d)}catch(e){}}
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+async function fusee(){
+ const al=$("alert");al.className="on flash";$("small").textContent="ALERTE FUSÉE !";$("big").textContent="🚀";
+ for(let i=0;i<10;i++){tone(i%2?600:900,.45,"square",.15);await wait(500);}
+ al.className="on count";$("small").textContent="Tout le monde avec moi :";
+ for(const k of ["3","2","1"]){$("big").textContent=k;tone(440,.4,"square",.2);await wait(1000);}
+ $("small").textContent="";$("big").textContent="DÉCOLLAGE ! 🚀";tone(880,1.2,"sawtooth",.2);
+ await wait(2500);al.className="";
+}
+$("go").onclick=()=>{if(busy)return;busy=true;$("res").textContent="";
+ const k=Math.floor(Math.random()*n);rot+=360*6+(360-(k+.5)*360/n)-(rot%360);
+ cv.style.transform="rotate("+rot+"deg)";const iv=setInterval(()=>tone(900,.05),120);
+ setTimeout(async()=>{clearInterval(iv);
+  if(k===FUSEE){await fusee();}
+  else [523,659,784].forEach((f,i)=>setTimeout(()=>tone(f,.3),i*120));
+  $("res").textContent=T[k][0]+" "+T[k][1];busy=false},4000)};
+</script></body></html>
