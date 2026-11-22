@@ -118,6 +118,19 @@ $("file").onchange = e => {
   $("fileName").textContent = "Vidéo chargée : " + f.name;
   $("ready").disabled = false; $("ready").style.opacity = 1;
 };
+// Chargement automatique de « boite-noire.mp4 » s'il est dans le même dossier que cette page
+(() => {
+  const v = $("vid");
+  const ok = () => {
+    if (videoURL) return; // une vidéo a déjà été choisie à la main
+    $("fileName").textContent = "✔ Vidéo trouvée automatiquement : boite-noire.mp4";
+    $("ready").disabled = false; $("ready").style.opacity = 1;
+  };
+  const ko = () => { if (!videoURL) $("fileName").textContent = "Aucune vidéo « boite-noire.mp4 » trouvée à côté de la page : choisis-la à la main."; };
+  v.addEventListener("loadedmetadata", ok, { once: true });
+  v.addEventListener("error", ko, { once: true });
+  v.src = "boite-noire.mp4"; v.load();
+})();
 $("ready").onclick = () => {
   try { document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {}); } catch (e) {}
   tone(660, .1); show("wait"); $("hint").style.display = "none";
